@@ -38,7 +38,7 @@ function genererSlug(nom) {
 // Route pour CRÉER un challenge (appelée par le formulaire organisateur)
 app.post('/api/challenges', (req, res) => {
   const {
-    nom, description, date_heure,
+    nom, description, theme, date_heure,
     inscription_debut, inscription_fin,
     confirmation_debut, confirmation_fin,
     nombre_questions, duree_reponse,
@@ -78,17 +78,17 @@ app.post('/api/challenges', (req, res) => {
 
   const stmt = db.prepare(`
     INSERT INTO challenges (
-      slug, nom, description, date_heure,
+      slug, nom, description, theme, date_heure,
       inscription_debut, inscription_fin,
       confirmation_debut, confirmation_fin,
       nombre_questions, duree_reponse,
       nombre_gagnants, bareme_points, recompenses,
       joker_actif, bonus_actif, indices_actif
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
-    slug, nom, description, date_heure,
+    slug, nom, description, theme || 'Général', date_heure,
     inscription_debut, inscription_fin,
     confirmation_debut, confirmation_fin,
     nombre_questions, duree_reponse,
@@ -226,6 +226,7 @@ app.get('/api/challenges/:slug/stats', (req, res) => {
     nombre_confirmes,
     nombre_questions: challenge.nombre_questions,
     duree_reponse: challenge.duree_reponse,
+    theme: challenge.theme,
     joker_actif: challenge.joker_actif,
     bonus_actif: challenge.bonus_actif,
     indices_actif: challenge.indices_actif

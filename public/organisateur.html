@@ -23,6 +23,9 @@
     <label>Description</label>
     <textarea id="description" rows="3" placeholder="Décris le challenge..."></textarea>
 
+    <label>Thème du quiz</label>
+    <input type="text" id="theme" required placeholder="Ex: Coupe du Monde, Culture générale, Cinéma, Histoire...">
+
     <label>Date et heure du challenge</label>
     <input type="datetime-local" id="date_heure" required>
 
@@ -149,6 +152,7 @@ const minDate = dateMinimaleActuelle();
       const data = {
         nom: document.getElementById('nom').value,
         description: document.getElementById('description').value,
+        theme: document.getElementById('theme').value,
         date_heure: document.getElementById('date_heure').value,
         inscription_debut: document.getElementById('inscription_debut').value,
         inscription_fin: document.getElementById('inscription_fin').value,

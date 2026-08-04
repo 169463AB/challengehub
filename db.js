@@ -14,6 +14,7 @@ db.exec(`
     slug TEXT UNIQUE NOT NULL,
     nom TEXT NOT NULL,
     description TEXT,
+    theme TEXT DEFAULT 'Général',
     date_heure TEXT,
     inscription_debut TEXT,
     inscription_fin TEXT,

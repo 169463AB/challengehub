@@ -249,7 +249,7 @@ async function afficherSalleAttente() {
   // Affichage des règles actives
   const regles = document.getElementById('listeRegles');
   regles.innerHTML = `
-    <li>📝 ${stats.nombre_questions} questions sur la Coupe du Monde</li>
+    <li>📝 ${stats.nombre_questions} questions sur le thème : ${stats.theme}</li>
     <li>⏱️ ${stats.duree_reponse} secondes pour répondre à chaque question</li>
     ${stats.joker_actif ? '<li>🔥 Joker disponible (1 par participant)</li>' : ''}
     ${stats.bonus_actif ? '<li>✨ Questions bonus surprises (points doublés)</li>' : ''}
