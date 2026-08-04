@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Rejoindre le Challenge - ChallengeHub</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 500px; margin: 40px auto; padding: 0 20px; text-align: center; }
+    h1 { color: #1a1a2e; }
+    p { color: #555; }
+    label { display: block; margin-top: 15px; font-weight: bold; text-align: left; }
+    input { width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; font-size: 16px; }
+    button { margin-top: 20px; padding: 12px 20px; background: #16a34a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; }
+    button:hover { background: #15803d; }
+    .secondaire { background: #6b7280; }
+    .secondaire:hover { background: #4b5563; }
+    #resultat { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
+    .succes { background: #f0fdf4; border: 1px solid #16a34a; color: #15803d; }
+    .erreur { background: #fef2f2; border: 1px solid #dc2626; color: #dc2626; }
+    .statut-box { margin-top: 20px; padding: 15px; background: #eff6ff; border: 1px solid #3b82f6; border-radius: 6px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="chargement">Chargement du challenge...</div>
+
+  <div id="contenu" class="hidden">
+    <h1 id="nomChallenge"></h1>
+    <p id="descriptionChallenge"></p>
+
+    <!-- ÉTAPE 1 : demander le numéro de téléphone -->
+    <div id="etapeTelephone">
+      <label>Ton numéro de téléphone</label>
+      <input type="tel" id="telephoneRecherche" required placeholder="Ex: 0700000000">
+      <button id="btnVerifier">Continuer</button>
+    </div>
+
+    <!-- ÉTAPE 2A : formulaire d'inscription (si nouveau participant) -->
+    <div id="etapeInscription" class="hidden">
+      <label>Ton nom</label>
+      <input type="text" id="nom" placeholder="Ex: Antoine Kouassi">
+      <button id="btnInscrire">S'inscrire au challenge</button>
+    </div>
+
+    <!-- ÉTAPE 2B : statut du participant existant -->
+    <div id="etapeStatut" class="hidden statut-box">
+      <p id="messageStatut"></p>
+      <button id="btnConfirmer" class="hidden">Confirmer ma présence</button>
+    </div>
+    <!-- SALLE D'ATTENTE -->
+<div id="salleAttente" class="hidden">
+  <h2>🕒 Salle d'attente</h2>
+  <div id="compteARebours" style="font-size: 28px; font-weight: bold; color: #16a34a; margin: 15px 0;"></div>
+  <p>👥 <strong id="nombreConfirmes">0</strong> participant(s) confirmé(s)</p>
+
+  <div style="text-align: left; margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 6px;">
+    <h3>📋 Règles du challenge</h3>
+    <ul id="listeRegles"></ul>
+  </div>
+</div>
+<!-- ZONE DE QUESTION EN DIRECT -->
+<div id="zoneQuestion" class="hidden">
+  <div style="background:#1a1a2e; color:white; padding:20px; border-radius:8px; text-align:left;">
+    <p style="opacity:0.7; margin:0;">Question <span id="numeroQuestion"></span></p>
+    <h2 id="texteQuestion" style="margin:10px 0;"></h2>
+    <div id="chronoQuestion" style="font-size:24px; font-weight:bold; color:#fbbf24;"></div>
+  </div>
+
+  <input type="text" id="reponseInput" placeholder="Ta réponse...">
+
+  <label id="labelJoker" class="hidden" style="font-weight:normal; display:flex; align-items:center; gap:8px; margin-top:10px; text-align:left;">
+    <input type="checkbox" id="jokerCheckbox" style="width:auto;"> 🔥 Activer mon Joker (une seule fois pour tout le challenge)
+  </label>
+
+  <button id="btnEnvoyerReponse">Envoyer ma réponse</button>
+
+  <p id="confirmationEnvoi" class="hidden" style="color:#16a34a; font-weight:bold;">✅ Réponse envoyée !</p>
+</div>
+
+<!-- RÉSULTATS DE LA QUESTION -->
+<div id="zoneResultats" class="hidden" style="margin-top:20px; text-align:left; background:#f9fafb; padding:15px; border-radius:8px;">
+  <h3>📊 Résultats</h3>
+  <p id="reponseCorrecteAffichee"></p>
+  <p id="bonusAffiche" class="hidden" style="color:#9d174d; font-weight:bold;">✨ C'était une question BONUS ! Points doublés !</p>
+  <ol id="classementQuestion"></ol>
+</div>
+<!-- CLASSEMENT GÉNÉRAL -->
+<div id="zoneClassement" class="hidden" style="margin-top:20px; text-align:left; background:#eff6ff; padding:15px; border-radius:8px;">
+  <h3>🏆 Classement général</h3>
+  <p id="maPosition" style="font-weight:bold; color:#1e40af;"></p>
+  <ol id="listeClassement"></ol>
+</div>
+<!-- ÉCRAN DE FIN DE CHALLENGE -->
+<div id="zoneFin" class="hidden" style="margin-top:20px; text-align:center;">
+  <h1>🏁 Challenge terminé !</h1>
+  <div id="podiumFinal" style="text-align:left; background:#fffbeb; border:2px solid #fbbf24; padding:20px; border-radius:8px;"></div>
+  <div id="resteClassement" style="text-align:left; margin-top:15px;"></div>
+</div>
+  </div>
+
+  <div id="resultat"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io(); // connexion automatique au serveur Socket.io
+socket.on('connect', () => {
+  console.log('✅ Connecté au serveur en temps réel, mon ID:', socket.id);
+});
+    const chemin = window.location.pathname;
+    const slug = chemin.split('/join/')[1];
+    let telephoneActuel = '';
+    let participantActuel = null;
+
+    async function chargerChallenge() {
+  const response = await fetch(`/api/challenges/${slug}`);
+  if (!response.ok) {
+    document.getElementById('chargement').innerText = '❌ Challenge introuvable.';
+    return;
+  }
+  const challenge = await response.json();
+  document.getElementById('nomChallenge').innerText = '🏆⚽ ' + challenge.nom;
+  document.getElementById('descriptionChallenge').innerText = challenge.description || '';
+  document.getElementById('chargement').style.display = 'none';
+  document.getElementById('contenu').classList.remove('hidden');
+
+  socket.emit('rejoindre_challenge', challenge.id);
+}
+    chargerChallenge();
+
+    function afficherErreur(message) {
+      const div = document.getElementById('resultat');
+      div.style.display = 'block';
+      div.className = 'erreur';
+      div.innerHTML = '❌ ' + message;
+    }
+
+    function afficherSucces(message) {
+      const div = document.getElementById('resultat');
+      div.style.display = 'block';
+      div.className = 'succes';
+      div.innerHTML = '✅ ' + message;
+    }
+
+    // ÉTAPE 1 : vérifier le numéro de téléphone
+    document.getElementById('btnVerifier').addEventListener('click', async () => {
+      const telephone = document.getElementById('telephoneRecherche').value.trim();
+      if (!telephone) return;
+      telephoneActuel = telephone;
+
+      const response = await fetch(`/api/challenges/${slug}/participants/lookup?telephone=${encodeURIComponent(telephone)}`);
+
+      document.getElementById('etapeTelephone').classList.add('hidden');
+
+      if (response.status === 404) {
+        // Nouveau participant → on montre le formulaire d'inscription
+        document.getElementById('etapeInscription').classList.remove('hidden');
+      } else {
+        const data = await response.json();
+        participantActuel = data.participant;
+        afficherStatut();
+      }
+    });
+
+    async function afficherStatut() {
+  socket.emit('identifier_participant', participantActuel.id);
+  document.getElementById('etapeStatut').classList.remove('hidden');
+  const message = document.getElementById('messageStatut');
+  const btnConfirmer = document.getElementById('btnConfirmer');
+
+  if (participantActuel.confirme) {
+    message.innerText = `Salut ${participantActuel.nom} 👋 Ta présence est déjà confirmée ✅.`;
+    btnConfirmer.classList.add('hidden');
+    afficherSalleAttente();
+  } else {
+    // On récupère les infos du challenge pour connaître l'heure de début des confirmations
+    const reponseChallenge = await fetch(`/api/challenges/${slug}`);
+    const challenge = await reponseChallenge.json();
+
+    const maintenant = new Date();
+    const debutConfirmation = new Date(challenge.confirmation_debut);
+    const finConfirmation = new Date(challenge.confirmation_fin);
+
+    if (maintenant < debutConfirmation) {
+      // La période de confirmation n'a pas encore commencé
+      const heureDebut = debutConfirmation.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+      message.innerText = `Salut ${participantActuel.nom} 👋 Tu es inscrit ! Les confirmations ouvriront le ${heureDebut}. Reviens sur ce lien à ce moment-là.`;
+      btnConfirmer.classList.add('hidden');
+    } else if (maintenant > finConfirmation) {
+      // La période de confirmation est déjà terminée
+      message.innerText = `Salut ${participantActuel.nom} 👋 La période de confirmation est terminée et tu n'as pas confirmé ta présence à temps. Tu ne fais malheureusement plus partie du challenge.`;
+      btnConfirmer.classList.add('hidden');
+    } else {
+      // La période de confirmation est ouverte maintenant
+      message.innerText = `Salut ${participantActuel.nom} 👋 Tu es inscrit mais pas encore confirmé.`;
+      btnConfirmer.classList.remove('hidden');
+    }
+  }
+}
+
+    // ÉTAPE 2A : inscription d'un nouveau participant
+    document.getElementById('btnInscrire').addEventListener('click', async () => {
+      const nom = document.getElementById('nom').value.trim();
+      if (!nom) return;
+
+      const response = await fetch(`/api/challenges/${slug}/participants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom, telephone: telephoneActuel })
+      });
+
+      const resultat = await response.json();
+
+      if (resultat.succes) {
+        afficherSucces('Inscription réussie ! Reviens confirmer ta présence quand la période de confirmation s\'ouvrira.');
+        document.getElementById('etapeInscription').classList.add('hidden');
+      } else {
+        afficherErreur(resultat.erreur);
+      }
+    });
+
+    // ÉTAPE 2B : confirmer sa présence
+    document.getElementById('btnConfirmer').addEventListener('click', async () => {
+  const response = await fetch(`/api/challenges/${slug}/participants/${participantActuel.id}/confirmer`, {
+    method: 'POST'
+  });
+
+  const resultat = await response.json();
+
+  if (resultat.succes) {
+    afficherSucces('Présence confirmée ! On te retrouve pour le challenge 🏆');
+    document.getElementById('btnConfirmer').classList.add('hidden');
+    afficherSalleAttente(); // ← nouvelle ligne
+  } else {
+    afficherErreur(resultat.erreur);
+  }
+});
+let dateChallenge = null;
+let jokerActifChallenge = false;
+
+async function afficherSalleAttente() {
+  document.getElementById('salleAttente').classList.remove('hidden');
+
+  const response = await fetch(`/api/challenges/${slug}/stats`);
+  const stats = await response.json();
+
+  dateChallenge = new Date(stats.date_heure);
+  jokerActifChallenge = !!stats.joker_actif;
+  document.getElementById('nombreConfirmes').innerText = stats.nombre_confirmes;
+
+  // Affichage des règles actives
+  const regles = document.getElementById('listeRegles');
+  regles.innerHTML = `
+    <li>📝 ${stats.nombre_questions} questions sur la Coupe du Monde</li>
+    <li>⏱️ ${stats.duree_reponse} secondes pour répondre à chaque question</li>
+    ${stats.joker_actif ? '<li>🔥 Joker disponible (1 par participant)</li>' : ''}
+    ${stats.bonus_actif ? '<li>✨ Questions bonus surprises (points doublés)</li>' : ''}
+    ${stats.indices_actif ? '<li>🤔 Questions à indices progressifs</li>' : ''}
+  `;
+
+  demarrerCompteARebours();
+  // On rafraîchit le nombre de confirmés toutes les 5 secondes
+  setInterval(rafraichirNombreConfirmes, 5000);
+}
+
+async function rafraichirNombreConfirmes() {
+  const response = await fetch(`/api/challenges/${slug}/stats`);
+  const stats = await response.json();
+  document.getElementById('nombreConfirmes').innerText = stats.nombre_confirmes;
+}
+
+function demarrerCompteARebours() {
+  setInterval(() => {
+    const maintenant = new Date();
+    const diff = dateChallenge - maintenant; // différence en millisecondes
+
+    const div = document.getElementById('compteARebours');
+
+    if (diff <= 0) {
+      div.innerText = '🚀 Le challenge commence !';
+      return;
+    }
+
+    const heures = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secondes = Math.floor((diff % (1000 * 60)) / 1000);
+
+    div.innerText = `${heures}h ${minutes}m ${secondes}s`;
+  }, 1000);
+}
+let questionActuelle = null;
+let dejaRepondu = false;
+
+socket.on('nouvelle_question', (question) => {
+  console.log('📩 Question reçue !', question); // ← nouvelle ligne
+  questionActuelle = question;
+  questionActuelle = question;
+  dejaRepondu = false;
+
+  document.getElementById('salleAttente').classList.add('hidden');
+  document.getElementById('zoneQuestion').classList.remove('hidden');
+  document.getElementById('confirmationEnvoi').classList.add('hidden');
+  document.getElementById('zoneResultats').classList.add('hidden');
+  document.getElementById('jokerCheckbox').checked = false;
+  const peutUtiliserJoker = jokerActifChallenge && participantActuel && !participantActuel.joker_utilise;
+  document.getElementById('labelJoker').classList.toggle('hidden', !peutUtiliserJoker);
+  document.getElementById('reponseInput').value = '';
+  document.getElementById('reponseInput').disabled = false;
+  document.getElementById('btnEnvoyerReponse').disabled = false;
+
+  document.getElementById('numeroQuestion').innerText = question.ordre;
+  if (question.type === 'indices') {
+    document.getElementById('texteQuestion').innerHTML = `<div>💡 Indice 1 : ${question.texte}</div>`;
+  } else {
+    document.getElementById('texteQuestion').innerText = question.texte;
+  }
+
+  // Le temps total diffère selon le type : 1x la durée pour une question normale, 3x pour les indices
+  const multiplicateur = question.type === 'indices' ? 3 : 1;
+  const finChrono = new Date(question.lancee_a).getTime() + (question.duree_reponse * 1000 * multiplicateur);
+
+  const intervalChrono = setInterval(() => {
+    const restant = Math.max(0, Math.ceil((finChrono - Date.now()) / 1000));
+    document.getElementById('chronoQuestion').innerText = `⏱️ ${restant}s`;
+
+    if (restant <= 0) {
+      clearInterval(intervalChrono);
+      document.getElementById('reponseInput').disabled = true;
+      document.getElementById('btnEnvoyerReponse').disabled = true;
+    }
+  }, 200);
+});
+
+socket.on('nouvel_indice', (data) => {
+  if (!questionActuelle || data.question_id !== questionActuelle.id) return;
+
+  const zone = document.getElementById('texteQuestion');
+  zone.innerHTML += `<div style="margin-top:6px;">💡 Indice ${data.numero} : ${data.texte}</div>`;
+});
+document.getElementById('btnEnvoyerReponse').addEventListener('click', () => {
+  if (dejaRepondu) return;
+
+  const reponse = document.getElementById('reponseInput').value.trim();
+  if (!reponse) return;
+
+  dejaRepondu = true;
+  document.getElementById('reponseInput').disabled = true;
+  document.getElementById('btnEnvoyerReponse').disabled = true;
+  document.getElementById('confirmationEnvoi').classList.remove('hidden');
+
+  // Envoi de la réponse au serveur via Socket.io
+ const jokerActive = document.getElementById('jokerCheckbox').checked;
+
+  socket.emit('envoyer_reponse', {
+    question_id: questionActuelle.id,
+    reponse: reponse,
+    joker: jokerActive
+  });
+
+  if (jokerActive) {
+    participantActuel.joker_utilise = true; // mise à jour locale immédiate (le serveur confirmera aussi)
+  }
+});
+
+// Confirmation venant du serveur que la réponse est bien enregistrée
+socket.on('reponse_confirmee', (data) => {
+  console.log('✅ Réponse confirmée par le serveur pour la question', data.question_id);
+});
+socket.on('resultats_question', (data) => {
+  document.getElementById('zoneResultats').classList.remove('hidden');
+  document.getElementById('reponseCorrecteAffichee').innerText = '✅ Bonne réponse : ' + data.bonne_reponse;
+  document.getElementById('bonusAffiche').classList.toggle('hidden', !data.est_bonus);
+
+  const liste = document.getElementById('classementQuestion');
+  liste.innerHTML = '';
+  const medailles = ['🥇', '🥈', '🥉'];
+
+  if (data.top3.length === 0) {
+    liste.innerHTML = '<li>Personne n\'a trouvé la bonne réponse cette fois 😅</li>';
+  } else {
+    data.top3.forEach((r, i) => {
+      liste.innerHTML += `<li>${medailles[i]} ${r.nom} — ${r.points} pts</li>`;
+    });
+  }
+});
+socket.on('resultats_question_indices', (data) => {
+  document.getElementById('zoneResultats').classList.remove('hidden');
+  document.getElementById('reponseCorrecteAffichee').innerText = '✅ Bonne réponse : ' + data.bonne_reponse;
+  document.getElementById('bonusAffiche').classList.toggle('hidden', !data.est_bonus);
+
+  const liste = document.getElementById('classementQuestion');
+  liste.innerHTML = '';
+
+  const libellesPaliers = { 1: '🥇 Répondu avant le 2e indice', 2: '🥈 Répondu avant le 3e indice', 3: '🥉 Répondu après le 3e indice' };
+
+  [1, 2, 3].forEach(palier => {
+    const gens = data.paliers[palier];
+    if (gens.length > 0) {
+      liste.innerHTML += `<li><strong>${libellesPaliers[palier]}</strong> :</li>`;
+      gens.forEach(g => {
+        liste.innerHTML += `<li style="margin-left:15px;">${g.nom} — ${g.points} pts</li>`;
+      });
+    }
+  });
+
+  if (data.paliers[1].length === 0 && data.paliers[2].length === 0 && data.paliers[3].length === 0) {
+    liste.innerHTML = '<li>Personne n\'a trouvé la bonne réponse 😅</li>';
+  }
+});
+socket.on('classement_mis_a_jour', (classement) => {
+  document.getElementById('zoneClassement').classList.remove('hidden');
+
+  const liste = document.getElementById('listeClassement');
+  liste.innerHTML = '';
+
+  const medailles = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+  classement.slice(0, 10).forEach(p => { // on affiche le top 10 pour ne pas surcharger
+    const medaille = medailles[p.position] || `${p.position}.`;
+    liste.innerHTML += `<li>${medaille} ${p.nom} — ${p.score} pts</li>`;
+  });
+
+  // On affiche la position du participant actuel, même s'il n'est pas dans le top 10
+  const moi = classement.find(p => p.nom === participantActuel.nom);
+  if (moi) {
+    document.getElementById('maPosition').innerText = `Ta position : #${moi.position} avec ${moi.score} pts`;
+  }
+});
+socket.on('challenge_termine', (data) => {
+  // On cache tout le reste, on montre uniquement l'écran de fin
+  document.getElementById('zoneQuestion').classList.add('hidden');
+  document.getElementById('salleAttente').classList.add('hidden');
+  document.getElementById('zoneClassement').classList.add('hidden');
+  document.getElementById('zoneFin').classList.remove('hidden');
+
+  const medailles = { 1: '🥇', 2: '🥈', 3: '🥉' };
+  const podium = document.getElementById('podiumFinal');
+  const reste = document.getElementById('resteClassement');
+
+  podium.innerHTML = '<h3>Podium final</h3>';
+  reste.innerHTML = data.classement.length > 3 ? '<h3>Autres participants</h3>' : '';
+
+  data.classement.forEach(p => {
+    const ligne = `<p>${medailles[p.position] || '#' + p.position} <strong>${p.nom}</strong> — ${p.score} pts${p.recompense ? '<br><span style="color:#92400e;">🎁 ' + p.recompense + '</span>' : ''}</p>`;
+
+    if (p.position <= 3) {
+      podium.innerHTML += ligne;
+    } else {
+      reste.innerHTML += ligne;
+    }
+  });
+});
+  </script>
+</body>
+</html>

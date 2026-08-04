@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Gérer les questions - ChallengeHub</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #1a1a2e; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { margin-top: 15px; padding: 10px 18px; background: #16a34a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; }
+    button:hover { background: #15803d; }
+    .question-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 15px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-left: 8px; }
+    .badge-normale { background: #dbeafe; color: #1e40af; }
+    .badge-indices { background: #fef3c7; color: #92400e; }
+    .badge-bonus { background: #fce7f3; color: #9d174d; }
+    #formAjout { border: 2px solid #16a34a; border-radius: 8px; padding: 20px; margin-top: 20px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>📝 Questions du challenge</h1>
+  <p id="nomChallengeAffiche"></p>
+  <button id="btnTerminer" style="background:#dc2626; margin-bottom:10px;">🏁 Terminer le challenge</button>
+
+  <div id="formAjout">
+    <h3>➕ Ajouter une question</h3>
+
+    <label>Type de question</label>
+    <select id="type">
+      <option value="normale">Normale</option>
+      <option value="indices">À indices (3 indices progressifs)</option>
+    </select>
+
+    <label>Question (ou 1er indice si type "indices")</label>
+    <textarea id="texte" rows="2" placeholder="Ex: Quel joueur a marqué en finale de la Coupe du Monde 1998 ?"></textarea>
+
+    <div id="champsIndices" class="hidden">
+      <label>2e indice</label>
+      <input type="text" id="indice_2" placeholder="Indice plus précis">
+      <label>3e indice</label>
+      <input type="text" id="indice_3" placeholder="Indice encore plus précis">
+    </div>
+
+    <label>Bonne(s) réponse(s) — séparées par une virgule si plusieurs variantes acceptées</label>
+    <input type="text" id="bonnes_reponses" placeholder="Ex: Zidane,Zizou">
+
+    <label>
+      <input type="checkbox" id="est_bonus" style="width:auto; display:inline;"> Marquer comme question BONUS potentielle
+    </label>
+
+    <button id="btnAjouter">Ajouter la question</button>
+  </div>
+
+  <h3 style="margin-top:30px;">📋 Questions déjà ajoutées (<span id="compteur">0</span>)</h3>
+  <div id="listeQuestions"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug'); // on récupère le slug depuis ?slug=xxx dans l'URL
+
+    document.getElementById('nomChallengeAffiche').innerText = 'Challenge : ' + slug;
+    document.getElementById('btnTerminer').addEventListener('click', async () => {
+  if (!confirm('Es-tu sûr de vouloir terminer le challenge maintenant ? Le classement final sera annoncé à tous les participants.')) return;
+
+  const response = await fetch(`/api/challenges/${slug}/terminer`, { method: 'POST' });
+  const resultat = await response.json();
+
+  if (resultat.succes) {
+    alert('✅ Challenge terminé ! Classement final envoyé aux participants.');
+  } else {
+    alert('❌ Erreur : ' + resultat.erreur);
+  }
+});
+
+    // Afficher/cacher les champs indices selon le type choisi
+    document.getElementById('type').addEventListener('change', (e) => {
+      document.getElementById('champsIndices').classList.toggle('hidden', e.target.value !== 'indices');
+    });
+
+    async function chargerQuestions() {
+  const response = await fetch(`/api/challenges/${slug}/questions`);
+  const questions = await response.json();
+
+  document.getElementById('compteur').innerText = questions.length;
+  const liste = document.getElementById('listeQuestions');
+  liste.innerHTML = '';
+
+  questions.forEach((q) => {
+    const badgeType = q.type === 'indices' ? '<span class="badge badge-indices">Indices</span>' : '<span class="badge badge-normale">Normale</span>';
+    const badgeBonus = q.est_bonus ? '<span class="badge badge-bonus">Bonus potentielle</span>' : '';
+
+    liste.innerHTML += `
+      <div class="question-card">
+        <strong>#${q.ordre}</strong> ${badgeType} ${badgeBonus}
+        <p>${q.texte}</p>
+        <p style="color:#16a34a;">✅ Réponse(s) : ${q.bonnes_reponses}</p>
+        <button onclick="lancerQuestion(${q.id})" style="background:#dc2626;">🚀 Lancer cette question</button>
+      </div>
+    `;
+  });
+}
+
+async function lancerQuestion(questionId) {
+  if (!confirm('Lancer cette question maintenant à tous les participants ?')) return;
+
+  const response = await fetch(`/api/challenges/${slug}/questions/${questionId}/lancer`, {
+    method: 'POST'
+  });
+
+  const resultat = await response.json();
+  if (resultat.succes) {
+    alert('✅ Question lancée !');
+  } else {
+    alert('❌ Erreur : ' + resultat.erreur);
+  }
+}
+    chargerQuestions();
+
+    document.getElementById('btnAjouter').addEventListener('click', async () => {
+      const type = document.getElementById('type').value;
+      const texte = document.getElementById('texte').value.trim();
+      const bonnes_reponses = document.getElementById('bonnes_reponses').value.trim();
+      const est_bonus = document.getElementById('est_bonus').checked;
+      const indice_2 = document.getElementById('indice_2').value.trim();
+      const indice_3 = document.getElementById('indice_3').value.trim();
+
+      if (!texte || !bonnes_reponses) {
+        alert('Merci de remplir au moins la question et la bonne réponse.');
+        return;
+      }
+
+      // On récupère le nombre de questions déjà présentes pour déterminer l'ordre suivant
+      const existantes = await (await fetch(`/api/challenges/${slug}/questions`)).json();
+      const ordre = existantes.length + 1;
+
+      await fetch(`/api/challenges/${slug}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordre, texte, type, bonnes_reponses, indice_2, indice_3, est_bonus })
+      });
+
+      // On vide le formulaire et on recharge la liste
+      document.getElementById('texte').value = '';
+      document.getElementById('bonnes_reponses').value = '';
+      document.getElementById('indice_2').value = '';
+      document.getElementById('indice_3').value = '';
+      document.getElementById('est_bonus').checked = false;
+
+      chargerQuestions();
+    });
+  </script>
+</body>
+</html>

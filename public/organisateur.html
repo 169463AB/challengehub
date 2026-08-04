@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Créer un Challenge - ChallengeHub</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #1a1a2e; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input, textarea { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { margin-top: 20px; padding: 12px 20px; background: #16a34a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+    button:hover { background: #15803d; }
+    #resultat { margin-top: 20px; padding: 15px; background: #f0fdf4; border: 1px solid #16a34a; border-radius: 6px; display: none; }
+  </style>
+</head>
+<body>
+  <h1>🏆⚽ Créer un Challenge</h1>
+
+  <form id="formChallenge">
+    <label>Nom du challenge</label>
+    <input type="text" id="nom" required placeholder="Ex: Coupe du Monde Quiz 2026">
+
+    <label>Description</label>
+    <textarea id="description" rows="3" placeholder="Décris le challenge..."></textarea>
+
+    <label>Date et heure du challenge</label>
+    <input type="datetime-local" id="date_heure" required>
+
+    <label>Début des inscriptions</label>
+    <input type="datetime-local" id="inscription_debut" required>
+
+    <label>Fin des inscriptions</label>
+    <input type="datetime-local" id="inscription_fin" required>
+
+    <label>Début des confirmations</label>
+    <input type="datetime-local" id="confirmation_debut" required>
+
+    <label>Fin des confirmations</label>
+    <input type="datetime-local" id="confirmation_fin" required>
+
+    <label>Nombre de questions</label>
+    <input type="number" id="nombre_questions" value="30" required>
+
+    <label>Durée de réponse (secondes)</label>
+    <input type="number" id="duree_reponse" value="10" required>
+
+    <label>Nombre de gagnants par question (qui marquent des points)</label>
+    <input type="number" id="nombre_gagnants" value="3" min="1" max="10" required>
+
+    <label>Points attribués (séparés par des virgules, dans l'ordre : 1er, 2e, 3e...)</label>
+    <input type="text" id="bareme_points" value="3,2,1" required placeholder="Ex: 3,2,1">
+    <small id="avertissementBareme" style="color:#dc2626; display:none;"></small>
+    <label>Récompenses finales (une par ligne, dans l'ordre : 1ère place, 2e place, 3e place...)</label>
+    <textarea id="recompenses" rows="3" placeholder="Ex:&#10;Maillot de l'équipe de ton choix&#10;10 Go d'Internet valable 1 semaine&#10;5 Go d'Internet valable 72h"></textarea>
+
+    <label>Règles spéciales</label>
+    <div style="margin-top:8px;">
+      <label style="font-weight:normal; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="joker_actif" checked style="width:auto;"> 🔥 Activer le Joker
+      </label>
+      <label style="font-weight:normal; display:flex; align-items:center; gap:8px; margin-top:6px;">
+        <input type="checkbox" id="bonus_actif" checked style="width:auto;"> ✨ Activer les questions Bonus
+      </label>
+      <label style="font-weight:normal; display:flex; align-items:center; gap:8px; margin-top:6px;">
+        <input type="checkbox" id="indices_actif" checked style="width:auto;"> 🤔 Activer les questions à Indices
+      </label>
+    </div>
+
+    <button type="submit">Créer le challenge</button>
+  </form>
+
+  <div id="resultat"></div>
+
+  <script>
+    // Empêche de choisir une date/heure déjà passée dans tous les champs datetime
+function dateMinimaleActuelle() {
+  const maintenant = new Date();
+  maintenant.setMinutes(maintenant.getMinutes() - maintenant.getTimezoneOffset()); // ajuste le fuseau horaire
+  return maintenant.toISOString().slice(0, 16); // format attendu par datetime-local : "AAAA-MM-JJTHH:MM"
+}
+
+const minDate = dateMinimaleActuelle();
+['date_heure', 'inscription_debut', 'inscription_fin', 'confirmation_debut', 'confirmation_fin'].forEach(id => {
+  document.getElementById(id).min = minDate;
+});
+    document.getElementById('formChallenge').addEventListener('submit', async (e) => {
+      e.preventDefault(); // empêche le rechargement de la page
+      // Vérification de cohérence entre nombre de gagnants et barème de points
+  const nombreGagnants = parseInt(document.getElementById('nombre_gagnants').value);
+  const baremeTexte = document.getElementById('bareme_points').value.trim();
+  const baremeValeurs = baremeTexte.split(',').map(v => v.trim()).filter(v => v !== '');
+
+  if (baremeValeurs.length !== nombreGagnants) {
+    const divResultat = document.getElementById('resultat');
+    divResultat.style.display = 'block';
+    divResultat.innerHTML = `❌ Tu as indiqué ${nombreGagnants} gagnant(s), mais ${baremeValeurs.length} valeur(s) de points dans le barème. Ces 2 nombres doivent être identiques.`;
+    return;
+  }
+
+  if (baremeValeurs.some(v => isNaN(v) || Number(v) <= 0)) {
+    const divResultat = document.getElementById('resultat');
+    divResultat.style.display = 'block';
+    divResultat.innerHTML = `❌ Le barème de points doit contenir uniquement des nombres positifs séparés par des virgules.`;
+    return;
+  }
+  // Récupère les récompenses (une par ligne), en ignorant les lignes vides
+  const recompensesTexte = document.getElementById('recompenses').value.trim();
+  const recompensesListe = recompensesTexte.split('\n').map(r => r.trim()).filter(r => r !== '');
+
+  if (recompensesListe.length === 0) {
+    const divResultat = document.getElementById('resultat');
+    divResultat.style.display = 'block';
+    divResultat.innerHTML = `❌ Merci d'indiquer au moins une récompense.`;
+    return;
+  }
+      // Vérification côté client : aucune date ne doit être dans le passé
+  const maintenant = new Date();
+  const champsDates = ['date_heure', 'inscription_debut', 'inscription_fin', 'confirmation_debut', 'confirmation_fin'];
+
+  for (const champId of champsDates) {
+    const valeur = document.getElementById(champId).value;
+    if (new Date(valeur) < maintenant) {
+      const divResultat = document.getElementById('resultat');
+      divResultat.style.display = 'block';
+      divResultat.innerHTML = `❌ Le champ "${champId}" contient une date/heure déjà passée. Merci de corriger.`;
+      return; // on arrête l'envoi du formulaire
+    }
+  }
+  // Vérification de l'ordre chronologique : inscriptions → confirmations → challenge
+  const iDebut = new Date(document.getElementById('inscription_debut').value);
+  const iFin = new Date(document.getElementById('inscription_fin').value);
+  const cDebut = new Date(document.getElementById('confirmation_debut').value);
+  const cFin = new Date(document.getElementById('confirmation_fin').value);
+  const dateChallenge = new Date(document.getElementById('date_heure').value);
+
+  const divResultat = document.getElementById('resultat');
+
+  if (iFin > cDebut) {
+    divResultat.style.display = 'block';
+    divResultat.innerHTML = `❌ La fin des inscriptions doit être avant (ou au moment de) le début des confirmations.`;
+    return;
+  }
+
+  if (cFin > dateChallenge) {
+    divResultat.style.display = 'block';
+    divResultat.innerHTML = `❌ La fin des confirmations doit être avant (ou au moment de) la date/heure du challenge.`;
+    return;
+  }
+      const data = {
+        nom: document.getElementById('nom').value,
+        description: document.getElementById('description').value,
+        date_heure: document.getElementById('date_heure').value,
+        inscription_debut: document.getElementById('inscription_debut').value,
+        inscription_fin: document.getElementById('inscription_fin').value,
+        confirmation_debut: document.getElementById('confirmation_debut').value,
+        confirmation_fin: document.getElementById('confirmation_fin').value,
+        nombre_questions: parseInt(document.getElementById('nombre_questions').value),
+        duree_reponse: parseInt(document.getElementById('duree_reponse').value),
+        nombre_gagnants: nombreGagnants,
+        bareme_points: baremeValeurs.join(','),
+        recompenses: JSON.stringify(recompensesListe),
+        joker_actif: document.getElementById('joker_actif').checked,
+        bonus_actif: document.getElementById('bonus_actif').checked,
+        indices_actif: document.getElementById('indices_actif').checked
+      };
+
+      const response = await fetch('/api/challenges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      const resultat = await response.json();
+
+      if (resultat.succes) {
+        const lienParticipant = `${window.location.origin}${resultat.lien}`;
+        const lienOrganisateur = `${window.location.origin}/questions.html?slug=${resultat.slug}`;
+
+        divResultat.style.display = 'block';
+        divResultat.innerHTML = `
+          ✅ Challenge créé avec succès !<br><br>
+
+          <strong>📢 Lien à partager avec les participants (ex: dans le groupe WhatsApp) :</strong><br>
+          <input type="text" readonly value="${lienParticipant}" style="margin-top:5px;" onclick="this.select()">
+          <button type="button" onclick="navigator.clipboard.writeText('${lienParticipant}'); this.innerText='✅ Copié !'">Copier ce lien</button>
+
+          <br><br>
+          <strong>🎛️ Ton lien organisateur (pour gérer les questions, garde-le pour toi) :</strong><br>
+          <input type="text" readonly value="${lienOrganisateur}" style="margin-top:5px;" onclick="this.select()">
+          <button type="button" onclick="navigator.clipboard.writeText('${lienOrganisateur}'); this.innerText='✅ Copié !'">Copier ce lien</button>
+        `;
+      } else {
+        divResultat.style.display = 'block';
+        divResultat.innerHTML = `❌ Erreur : ${resultat.erreur}`;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Mon historique - ChallengeHub</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #1a1a2e; text-align:center; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input { width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; font-size: 16px; }
+    button { margin-top: 15px; padding: 12px 20px; background: #16a34a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; }
+    .hidden { display: none; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+    .stat-card { background: #eff6ff; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card .valeur { font-size: 28px; font-weight: bold; color: #1e40af; }
+    .stat-card .label { font-size: 13px; color: #555; }
+    .challenge-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 12px; }
+    .badge-en_cours { color: #16a34a; font-weight: bold; }
+    .badge-termine { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <h1>📊 Mon historique ChallengeHub</h1>
+
+  <div id="etapeRecherche">
+    <label>Ton numéro de téléphone</label>
+    <input type="tel" id="telephoneInput" placeholder="Ex: 0700000000">
+    <button id="btnRechercher">Voir mon historique</button>
+  </div>
+
+  <div id="resultat" style="margin-top:15px; color:#dc2626;"></div>
+
+  <div id="contenuHistorique" class="hidden">
+    <h2 id="nomParticipant"></h2>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="valeur" id="statChallenges">0</div>
+        <div class="label">Challenges joués</div>
+      </div>
+      <div class="stat-card">
+        <div class="valeur" id="statVictoires">0</div>
+        <div class="label">🥇 Victoires</div>
+      </div>
+      <div class="stat-card">
+        <div class="valeur" id="statPodiums">0</div>
+        <div class="label">🏆 Podiums</div>
+      </div>
+      <div class="stat-card">
+        <div class="valeur" id="statBonnesReponses">0</div>
+        <div class="label">✅ Bonnes réponses</div>
+      </div>
+    </div>
+
+    <p id="meilleurePosition" style="text-align:center; margin-top:15px; font-weight:bold;"></p>
+
+    <h3 style="margin-top:25px;">📋 Détail par challenge</h3>
+    <div id="listeChallenges"></div>
+  </div>
+
+  <script>
+    document.getElementById('btnRechercher').addEventListener('click', async () => {
+      const telephone = document.getElementById('telephoneInput').value.trim();
+      if (!telephone) return;
+
+      const response = await fetch(`/api/participants/historique?telephone=${encodeURIComponent(telephone)}`);
+      const data = await response.json();
+
+      const divResultat = document.getElementById('resultat');
+
+      if (!data.trouve) {
+        divResultat.innerText = '❌ Aucune participation trouvée avec ce numéro.';
+        document.getElementById('contenuHistorique').classList.add('hidden');
+        return;
+      }
+
+      divResultat.innerText = '';
+      document.getElementById('contenuHistorique').classList.remove('hidden');
+
+      document.getElementById('nomParticipant').innerText = '👋 ' + data.stats.nom;
+      document.getElementById('statChallenges').innerText = data.stats.nombreChallenges;
+      document.getElementById('statVictoires').innerText = data.stats.victoires;
+      document.getElementById('statPodiums').innerText = data.stats.podiums;
+      document.getElementById('statBonnesReponses').innerText = data.stats.totalBonnesReponses;
+
+      document.getElementById('meilleurePosition').innerText = data.stats.meilleurePosition
+        ? `🌟 Meilleur classement : #${data.stats.meilleurePosition}`
+        : '';
+
+      const liste = document.getElementById('listeChallenges');
+      liste.innerHTML = '';
+
+      data.historique.forEach(h => {
+        const statutTexte = h.challenge_statut === 'termine' ? 'Terminé' : 'En cours / à venir';
+        const statutClasse = h.challenge_statut === 'termine' ? 'badge-termine' : 'badge-en_cours';
+        const positionTexte = h.position ? `#${h.position}` : 'Non confirmé';
+
+        liste.innerHTML += `
+          <div class="challenge-card">
+            <strong>${h.challenge_nom}</strong> — <span class="${statutClasse}">${statutTexte}</span>
+            <p>📅 ${new Date(h.date).toLocaleDateString('fr-FR')}</p>
+            <p>🎯 Score : <strong>${h.score} pts</strong> | Position : <strong>${positionTexte}</strong> | ✅ ${h.bonnesReponses} bonne(s) réponse(s)</p>
+          </div>
+        `;
+      });
+    });
+  </script>
+</body>
+</html>
